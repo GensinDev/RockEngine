@@ -35,6 +35,18 @@ namespace RockEngine
         // Создаем стартовую сцену: Camera + Cube + Light.
         m_Scene.CreateDefaultScene();
 
+        // После создания сцены назначаем встроенный Mesh всем объектам,
+        // у которых есть MeshRenderer, но пока нет MeshPtr.
+        // Это временное решение.
+        // Позже сделаем нормальный AssetManager / MeshLibrary.
+        for (auto &entity : m_Scene.Entities)
+        {
+            if (entity.HasMeshRenderer && !entity.MeshRenderer.MeshPtr)
+            {
+                entity.MeshRenderer.MeshPtr = Renderer::GetCubeMesh();
+            }
+        }
+
         // Начальная папка Asset Browser.
         m_CurrentAssetPath =
             std::filesystem::path(ROCKENGINE_PROJECT_DIR) / "Assets";
@@ -76,11 +88,22 @@ namespace RockEngine
 
     void Application::CreateCube()
     {
-        // MeshRenderer означает: этот Entity должен рисоваться Renderer-ом.
+        // Создаем новый объект сцены.
         Entity cube;
+
+        // Имя, которое будет видно в Hierarchy.
         cube.Name = "Cube";
+
+        // Включаем MeshRenderer.
+        // Это значит: Renderer должен рисовать этот Entity.
         cube.HasMeshRenderer = true;
 
+        // Назначаем кубу встроенный Mesh куба.
+        // Теперь геометрия хранится не в Renderer напрямую,
+        // а в отдельном объекте Mesh.
+        cube.MeshRenderer.MeshPtr = Renderer::GetCubeMesh();
+
+        // Добавляем объект в сцену.
         m_Scene.Entities.push_back(cube);
     }
 
@@ -208,6 +231,13 @@ namespace RockEngine
                             "Main.rockscene";
 
                         m_Scene.LoadFromFile(m_CurrentScenePath.string());
+                        for (auto &entity : m_Scene.Entities)
+                        {
+                            if (entity.HasMeshRenderer && !entity.MeshRenderer.MeshPtr)
+                            {
+                                entity.MeshRenderer.MeshPtr = Renderer::GetCubeMesh();
+                            }
+                        }
                         m_SelectedEntity = -1;
                     }
 
@@ -456,6 +486,13 @@ namespace RockEngine
                             {
                                 m_CurrentScenePath = path;
                                 m_Scene.LoadFromFile(m_CurrentScenePath.string());
+                                for (auto &entity : m_Scene.Entities)
+                                {
+                                    if (entity.HasMeshRenderer && !entity.MeshRenderer.MeshPtr)
+                                    {
+                                        entity.MeshRenderer.MeshPtr = Renderer::GetCubeMesh();
+                                    }
+                                }
                                 m_SelectedEntity = -1;
                             }
                         }
@@ -600,6 +637,13 @@ namespace RockEngine
                         {
                             m_CurrentScenePath = assetPath;
                             m_Scene.LoadFromFile(m_CurrentScenePath.string());
+                            for (auto &entity : m_Scene.Entities)
+                            {
+                                if (entity.HasMeshRenderer && !entity.MeshRenderer.MeshPtr)
+                                {
+                                    entity.MeshRenderer.MeshPtr = Renderer::GetCubeMesh();
+                                }
+                            }
                             m_SelectedEntity = -1;
                         }
                     }

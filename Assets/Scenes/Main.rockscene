@@ -16,7 +16,7 @@ HasMeshRenderer 1
 HasCamera 0
 HasLight 0
 MeshRendererEnabled 1
-MeshRendererColor 0.840061 0.878749 0.901961
+MeshRendererColor 0.2 0.7 1
 CameraPrimary 0
 LightColor 1 1 1
 LightIntensity 1
@@ -34,6 +34,32 @@ CameraPrimary 0
 LightColor 1 1 1
 LightIntensity 1
 Position 2 2 0
+Rotation 0 0 0
+Scale 1 1 1
+EndEntity
+Entity "Cube"
+HasMeshRenderer 1
+HasCamera 0
+HasLight 0
+MeshRendererEnabled 1
+MeshRendererColor 0.860727 0.97549 0
+CameraPrimary 0
+LightColor 1 1 1
+LightIntensity 1
+Position -2.1 0 0
+Rotation 0 0 0
+Scale 1 1 1
+EndEntity
+Entity "Cube"
+HasMeshRenderer 1
+HasCamera 0
+HasLight 0
+MeshRendererEnabled 1
+MeshRendererColor 0.931373 0.293538 0.0639177
+CameraPrimary 0
+LightColor 1 1 1
+LightIntensity 1
+Position 2.3 0 0
 Rotation 0 0 0
 Scale 1 1 1
 EndEntity

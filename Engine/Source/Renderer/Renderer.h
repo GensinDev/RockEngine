@@ -1,9 +1,12 @@
 #pragma once
 
+#include <memory>
+
 namespace RockEngine
 {
     class Scene;
     class EditorCamera;
+    class Mesh;
 
     class Renderer
     {
@@ -13,6 +16,8 @@ namespace RockEngine
 
         static void BeginFrame();
         static void EndFrame();
+
+        static std::shared_ptr<Mesh> GetCubeMesh();
 
         // Основной рендер сцены.
         static void RenderScene(
@@ -26,8 +31,6 @@ namespace RockEngine
             const EditorCamera &camera);
 
     private:
-        static unsigned int s_VertexArray;
-        static unsigned int s_VertexBuffer;
         static unsigned int s_ShaderProgram;
     };
 }

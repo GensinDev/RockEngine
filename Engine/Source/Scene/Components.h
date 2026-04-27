@@ -1,7 +1,11 @@
 #pragma once
 
+#include "Renderer/Mesh.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#include <memory>
 
 namespace RockEngine
 {
@@ -54,12 +58,12 @@ namespace RockEngine
     // значит Renderer должен его рисовать.
     struct MeshRendererComponent
     {
-        // Включен ли рендер объекта.
         bool Enabled = true;
 
-        // Цвет объекта.
-        // Пока это простой base color без освещения.
         glm::vec3 Color = {0.2f, 0.7f, 1.0f};
+
+        //  НОВОЕ
+        std::shared_ptr<Mesh> MeshPtr;
     };
 
     // =========================

@@ -1,5 +1,6 @@
 #include "Renderer/Renderer.h"
 #include "Renderer/EditorCamera.h"
+#include "Renderer/Mesh.h"
 
 #include "Scene/Scene.h"
 
@@ -9,272 +10,58 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
+#include <memory>
+#include <vector>
 
 namespace RockEngine
 {
-    // VAO хранит описание формата вершин:
-    // какие данные есть у вершины и как OpenGL должен их читать.
-    unsigned int Renderer::s_VertexArray = 0;
-
-    // VBO хранит сами вершины куба.
-    unsigned int Renderer::s_VertexBuffer = 0;
-
-    // Shader program = vertex shader + fragment shader.
+    // =========================
+    // SHADER PROGRAM
+    // =========================
+    // Теперь Renderer больше не хранит VAO/VBO куба напрямую.
+    // Геометрия переехала в Mesh.
+    //
+    // Renderer хранит только shader program,
+    // потому что один шейдер может рисовать разные Mesh.
     unsigned int Renderer::s_ShaderProgram = 0;
+
+    // =========================
+    // BUILT-IN MESHES
+    // =========================
+    // Это встроенный куб движка.
+    // Пока он создается прямо в Renderer::Init().
+    //
+    // Позже мы вынесем это в AssetManager или MeshLibrary.
+    static std::shared_ptr<Mesh> s_CubeMesh;
 
     void Renderer::Init()
     {
-        // Depth test нужен для 3D.
-        // Ближние пиксели будут перекрывать дальние.
+        // =========================
+        // OPENGL STATE
+        // =========================
+
+        // Depth Test нужен для 3D.
+        // Он делает так, что ближние объекты перекрывают дальние.
         glEnable(GL_DEPTH_TEST);
 
-        // Отсекаем задние грани куба.
-        // Это ускоряет рендер и убирает лишнюю геометрию.
+        // Back-face culling отключает отрисовку задних граней.
+        // Это ускоряет рендер и делает куб визуально чище.
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
 
-        // Формат вершины:
-        // x, y, z, r, g, b
+        // =========================
+        // SHADERS
+        // =========================
+        // Vertex Shader:
+        // - принимает позицию вершины
+        // - принимает цвет вершины
+        // - умножает позицию на MVP матрицу
         //
-        // x y z — позиция вершины
-        // r g b — цвет вершины
-        float vertices[] =
-            {
-                // Front face - red
-                -0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                0.0f,
-                0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                0.0f,
-                0.5f,
-                0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                0.0f,
-
-                0.5f,
-                0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                0.0f,
-                -0.5f,
-                0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                0.0f,
-                -0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                0.0f,
-
-                // Back face - green
-                -0.5f,
-                -0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                0.0f,
-                -0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                0.0f,
-                0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                0.0f,
-
-                0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                0.0f,
-                0.5f,
-                -0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                0.0f,
-                -0.5f,
-                -0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                0.0f,
-
-                // Left face - blue
-                -0.5f,
-                0.5f,
-                0.5f,
-                0.0f,
-                0.0f,
-                1.0f,
-                -0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                0.0f,
-                1.0f,
-                -0.5f,
-                -0.5f,
-                -0.5f,
-                0.0f,
-                0.0f,
-                1.0f,
-
-                -0.5f,
-                -0.5f,
-                -0.5f,
-                0.0f,
-                0.0f,
-                1.0f,
-                -0.5f,
-                -0.5f,
-                0.5f,
-                0.0f,
-                0.0f,
-                1.0f,
-                -0.5f,
-                0.5f,
-                0.5f,
-                0.0f,
-                0.0f,
-                1.0f,
-
-                // Right face - yellow
-                0.5f,
-                0.5f,
-                0.5f,
-                1.0f,
-                1.0f,
-                0.0f,
-                0.5f,
-                -0.5f,
-                -0.5f,
-                1.0f,
-                1.0f,
-                0.0f,
-                0.5f,
-                0.5f,
-                -0.5f,
-                1.0f,
-                1.0f,
-                0.0f,
-
-                0.5f,
-                -0.5f,
-                -0.5f,
-                1.0f,
-                1.0f,
-                0.0f,
-                0.5f,
-                0.5f,
-                0.5f,
-                1.0f,
-                1.0f,
-                0.0f,
-                0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                1.0f,
-                0.0f,
-
-                // Top face - cyan
-                -0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                1.0f,
-                -0.5f,
-                0.5f,
-                0.5f,
-                0.0f,
-                1.0f,
-                1.0f,
-                0.5f,
-                0.5f,
-                0.5f,
-                0.0f,
-                1.0f,
-                1.0f,
-
-                0.5f,
-                0.5f,
-                0.5f,
-                0.0f,
-                1.0f,
-                1.0f,
-                0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                1.0f,
-                -0.5f,
-                0.5f,
-                -0.5f,
-                0.0f,
-                1.0f,
-                1.0f,
-
-                // Bottom face - magenta
-                -0.5f,
-                -0.5f,
-                -0.5f,
-                1.0f,
-                0.0f,
-                1.0f,
-                0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                1.0f,
-                -0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                1.0f,
-
-                0.5f,
-                -0.5f,
-                0.5f,
-                1.0f,
-                0.0f,
-                1.0f,
-                -0.5f,
-                -0.5f,
-                -0.5f,
-                1.0f,
-                0.0f,
-                1.0f,
-                0.5f,
-                -0.5f,
-                -0.5f,
-                1.0f,
-                0.0f,
-                1.0f,
-            };
-
+        // MVP = Projection * View * Model
+        //
+        // Model      — положение объекта в мире
+        // View       — камера
+        // Projection — перспектива
         const char *vertexSrc = R"(
 #version 330
 
@@ -292,6 +79,14 @@ void main()
 }
 )";
 
+        // Fragment Shader:
+        // - либо использует цвет вершины
+        // - либо принудительный цвет объекта через u_Color
+        //
+        // u_UseObjectColor нужен для:
+        // - подсветки выбранного объекта
+        // - GPU picking
+        // - цвета MeshRendererComponent
         const char *fragmentSrc = R"(
 #version 330
 
@@ -318,12 +113,22 @@ void main()
         int success;
         char infoLog[512];
 
-        // Создаем и компилируем vertex shader.
+        // =========================
+        // VERTEX SHADER COMPILE
+        // =========================
+
         unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertexShader, 1, &vertexSrc, nullptr);
+
+        glShaderSource(
+            vertexShader,
+            1,
+            &vertexSrc,
+            nullptr);
+
         glCompileShader(vertexShader);
 
         glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+
         if (!success)
         {
             glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
@@ -331,12 +136,22 @@ void main()
                       << infoLog << std::endl;
         }
 
-        // Создаем и компилируем fragment shader.
+        // =========================
+        // FRAGMENT SHADER COMPILE
+        // =========================
+
         unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragmentShader, 1, &fragmentSrc, nullptr);
+
+        glShaderSource(
+            fragmentShader,
+            1,
+            &fragmentSrc,
+            nullptr);
+
         glCompileShader(fragmentShader);
 
         glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+
         if (!success)
         {
             glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
@@ -344,13 +159,19 @@ void main()
                       << infoLog << std::endl;
         }
 
-        // Создаем shader program и линкуем оба шейдера.
+        // =========================
+        // SHADER PROGRAM LINK
+        // =========================
+
         s_ShaderProgram = glCreateProgram();
+
         glAttachShader(s_ShaderProgram, vertexShader);
         glAttachShader(s_ShaderProgram, fragmentShader);
+
         glLinkProgram(s_ShaderProgram);
 
         glGetProgramiv(s_ShaderProgram, GL_LINK_STATUS, &success);
+
         if (!success)
         {
             glGetProgramInfoLog(s_ShaderProgram, 512, nullptr, infoLog);
@@ -358,65 +179,112 @@ void main()
                       << infoLog << std::endl;
         }
 
-        // После линковки отдельные shader objects уже не нужны.
+        // После линковки отдельные shader objects больше не нужны.
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
 
-        // Создаем VAO.
-        glGenVertexArrays(1, &s_VertexArray);
-        glBindVertexArray(s_VertexArray);
+        // =========================
+        // CREATE BUILT-IN CUBE MESH
+        // =========================
+        // Теперь куб — это не VAO/VBO внутри Renderer.
+        // Куб — это объект Mesh.
+        //
+        // Vertex содержит:
+        // - Position
+        // - Color
+        //
+        // 6 граней * 2 треугольника * 3 вершины = 36 вершин.
+        std::vector<Vertex> cubeVertices =
+            {
+                // Front face - red
+                {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+                {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+                {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
 
-        // Создаем VBO и загружаем вершины в видеопамять.
-        glGenBuffers(1, &s_VertexBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, s_VertexBuffer);
+                {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+                {{-0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
+                {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}},
 
-        glBufferData(
-            GL_ARRAY_BUFFER,
-            sizeof(vertices),
-            vertices,
-            GL_STATIC_DRAW);
+                // Back face - green
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
 
-        // Attribute 0: позиция.
-        // stride = 6 float, потому что вершина: x y z r g b.
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(
-            0,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            6 * sizeof(float),
-            nullptr);
+                {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
 
-        // Attribute 1: цвет.
-        // offset = 3 float, потому что цвет начинается после x y z.
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(
-            1,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            6 * sizeof(float),
-            reinterpret_cast<void *>(3 * sizeof(float)));
+                // Left face - blue
+                {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glBindVertexArray(0);
+                {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}},
+                {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+                {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+
+                // Right face - yellow
+                {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 0.0f}},
+                {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
+                {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
+
+                {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.0f}},
+                {{0.5f, 0.5f, 0.5f}, {1.0f, 1.0f, 0.0f}},
+                {{0.5f, -0.5f, 0.5f}, {1.0f, 1.0f, 0.0f}},
+
+                // Top face - cyan
+                {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
+                {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
+                {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
+
+                {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 1.0f}},
+                {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
+                {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 1.0f}},
+
+                // Bottom face - magenta
+                {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+                {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
+                {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
+
+                {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 1.0f}},
+                {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+                {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 1.0f}},
+            };
+
+        // Создаем Mesh из массива вершин.
+        // Mesh сам создаст VAO/VBO внутри себя.
+        s_CubeMesh = std::make_shared<Mesh>(cubeVertices);
     }
 
     void Renderer::Shutdown()
     {
+        // Освобождаем shader program.
         glDeleteProgram(s_ShaderProgram);
-        glDeleteBuffers(1, &s_VertexBuffer);
-        glDeleteVertexArrays(1, &s_VertexArray);
+
+        // Освобождаем shared_ptr.
+        // Когда shared_ptr станет пустым,
+        // Mesh должен освободить свои OpenGL ресурсы.
+        s_CubeMesh.reset();
     }
 
     void Renderer::BeginFrame()
     {
+        // Цвет очистки viewport.
         glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
+
+        // Очищаем цвет и depth buffer.
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
     void Renderer::EndFrame()
     {
+        // Пока пусто.
+        // SwapBuffers делает EngineWindow.
+    }
+
+    std::shared_ptr<Mesh> Renderer::GetCubeMesh()
+    {
+        return s_CubeMesh;
     }
 
     void Renderer::RenderScene(
@@ -424,31 +292,44 @@ void main()
         const EditorCamera &camera,
         int selectedEntity)
     {
+        // Активируем shader program.
         glUseProgram(s_ShaderProgram);
+
+        // На всякий случай гарантируем обычный fill режим.
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glBindVertexArray(s_VertexArray);
 
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = camera.GetProjectionMatrix();
 
+        // Получаем locations uniform-переменных один раз перед циклом.
         int mvpLocation = glGetUniformLocation(s_ShaderProgram, "u_MVP");
         int colorLocation = glGetUniformLocation(s_ShaderProgram, "u_Color");
-        int useObjectColorLocation = glGetUniformLocation(s_ShaderProgram, "u_UseObjectColor");
+        int useObjectColorLocation =
+            glGetUniformLocation(s_ShaderProgram, "u_UseObjectColor");
 
-        for (int i = 0; i < scene.Entities.size(); i++)
+        for (int i = 0; i < static_cast<int>(scene.Entities.size()); i++)
         {
             const auto &entity = scene.Entities[i];
 
-            // ECS-lite логика:
-            // если у объекта нет MeshRenderer, Renderer его не рисует.
+            // ECS-lite:
+            // объект рисуется только если у него есть MeshRenderer
+            // и этот компонент включен.
             if (!entity.HasMeshRenderer || !entity.MeshRenderer.Enabled)
             {
                 continue;
             }
 
-            // TransformComponent сам собирает model matrix.
+            // Если MeshRenderer не имеет Mesh,
+            // рисовать нечего.
+            if (!entity.MeshRenderer.MeshPtr)
+            {
+                continue;
+            }
+
+            // Model matrix берется из TransformComponent.
             glm::mat4 model = entity.Transform.GetTransform();
 
+            // Итоговая матрица для шейдера.
             glm::mat4 mvp = projection * view * model;
 
             glUniformMatrix4fv(
@@ -457,18 +338,16 @@ void main()
                 GL_FALSE,
                 glm::value_ptr(mvp));
 
-            // Если объект выбран — рисуем его оранжевым.
-            // Иначе используем цветные грани куба.
             if (i == selectedEntity)
             {
+                // Выбранный объект рисуем оранжевым.
                 glUniform1i(useObjectColorLocation, 1);
                 glUniform3f(colorLocation, 1.0f, 0.6f, 0.1f);
             }
             else
             {
-                // Обычный объект рисуем цветом из MeshRendererComponent.
+                // Обычный объект рисуем цветом из MeshRenderer.
                 glUniform1i(useObjectColorLocation, 1);
-
                 glUniform3f(
                     colorLocation,
                     entity.MeshRenderer.Color.x,
@@ -476,10 +355,13 @@ void main()
                     entity.MeshRenderer.Color.z);
             }
 
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            // Mesh сам знает, какой VAO нужно привязать.
+            entity.MeshRenderer.MeshPtr->Bind();
+
+            // Mesh сам знает, сколько вершин нужно нарисовать.
+            entity.MeshRenderer.MeshPtr->Draw();
         }
 
-        glBindVertexArray(0);
         glUseProgram(0);
     }
 
@@ -487,26 +369,34 @@ void main()
         const Scene &scene,
         const EditorCamera &camera)
     {
+        // Picking — это скрытый рендер.
+        // Мы рисуем каждый объект уникальным цветом,
+        // чтобы потом прочитать пиксель под мышкой.
         glUseProgram(s_ShaderProgram);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glBindVertexArray(s_VertexArray);
 
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = camera.GetProjectionMatrix();
 
         int mvpLocation = glGetUniformLocation(s_ShaderProgram, "u_MVP");
         int colorLocation = glGetUniformLocation(s_ShaderProgram, "u_Color");
-        int useObjectColorLocation = glGetUniformLocation(s_ShaderProgram, "u_UseObjectColor");
+        int useObjectColorLocation =
+            glGetUniformLocation(s_ShaderProgram, "u_UseObjectColor");
 
-        // Picking всегда использует объектный цвет.
+        // В picking всегда используем принудительный цвет объекта.
         glUniform1i(useObjectColorLocation, 1);
 
-        for (int i = 0; i < scene.Entities.size(); i++)
+        for (int i = 0; i < static_cast<int>(scene.Entities.size()); i++)
         {
             const auto &entity = scene.Entities[i];
 
-            // Picking нужен только для объектов, которые реально рисуются.
+            // Picking нужен только для реально рисуемых Mesh объектов.
             if (!entity.HasMeshRenderer || !entity.MeshRenderer.Enabled)
+            {
+                continue;
+            }
+
+            if (!entity.MeshRenderer.MeshPtr)
             {
                 continue;
             }
@@ -520,15 +410,17 @@ void main()
                 GL_FALSE,
                 glm::value_ptr(mvp));
 
-            // Кодируем индекс Entity в красный канал.
-            // 0 означает "ничего", поэтому используем i + 1.
+            // Кодируем ID объекта в красный канал.
+            // 0 = ничего.
+            // Поэтому используем i + 1.
             float idColor = static_cast<float>(i + 1) / 255.0f;
+
             glUniform3f(colorLocation, idColor, 0.0f, 0.0f);
 
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            entity.MeshRenderer.MeshPtr->Bind();
+            entity.MeshRenderer.MeshPtr->Draw();
         }
 
-        glBindVertexArray(0);
         glUseProgram(0);
     }
 }
