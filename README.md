@@ -170,7 +170,7 @@ Editor/
 
 
 
-Build a full-featured game engine and create a story-driven open-world game.
+Create a fully functional game engine and develop an open-world story-driven game.
 
 
 
