@@ -1,0 +1,28 @@
+#pragma once
+
+namespace RockEngine
+{
+    class Scene;
+
+    class EditorCamera;
+
+    class Renderer
+    {
+    public:
+        static void Init();
+        static void Shutdown();
+
+        static void BeginFrame();
+        static void EndFrame();
+
+        static void DrawTriangle();
+        static void RenderScene(const Scene &scene, const EditorCamera &camera, int selectedEntity);
+
+        static void RenderScenePicking(const Scene &scene, const EditorCamera &camera);
+
+    private:
+        static unsigned int s_VertexArray;
+        static unsigned int s_VertexBuffer;
+        static unsigned int s_ShaderProgram;
+    };
+}

@@ -1,0 +1,27 @@
+# Build папки
+Build/
+bin/
+out/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Visual Studio
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Windows
+*.exe
+*.dll
+*.pdb
+
+# Logs
+*.log
+
+# ImGui ini
+imgui.ini

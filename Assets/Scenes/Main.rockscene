@@ -1,0 +1,18 @@
+Entity "Camera"
+Type Camera
+Position 0 0 5
+Rotation 0 0 0
+Scale 1 1 1
+EndEntity
+Entity "Cube"
+Type Mesh
+Position 0 0 0
+Rotation 20 30 0
+Scale 1 1 1
+EndEntity
+Entity "Light"
+Type Light
+Position 2 2 0
+Rotation 0 0 0
+Scale 1 1 1
+EndEntity
