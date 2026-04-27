@@ -70,15 +70,27 @@ The goal of this project is to learn engine architecture and eventually build a 
 
 \* Basic cube rendering
 
+\* MeshRenderer color editing
+
 
 
 ##### Scene System
 
 
 
+\* ECS-lite architecture
+
 \* Entity system
 
-\* Transform (Position / Rotation / Scale)
+\* Components:
+
+&#x20; \* TransformComponent
+
+&#x20; \* MeshRendererComponent
+
+&#x20; \* CameraComponent
+
+&#x20; \* LightComponent
 
 \* Scene save/load (.rockscene)
 
@@ -150,7 +162,7 @@ Editor/
 
 
 
-\* ECS (component system)
+\* Mesh system
 
 \* Mesh / Model loading
 
@@ -187,6 +199,4 @@ Create a fully functional game engine and develop an open-world story-driven gam
 C++ Developer
 
 Building a custom game engine
-
-
 
