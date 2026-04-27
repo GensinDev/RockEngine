@@ -3,7 +3,6 @@
 namespace RockEngine
 {
     class Scene;
-
     class EditorCamera;
 
     class Renderer
@@ -15,10 +14,16 @@ namespace RockEngine
         static void BeginFrame();
         static void EndFrame();
 
-        static void DrawTriangle();
-        static void RenderScene(const Scene &scene, const EditorCamera &camera, int selectedEntity);
+        // Основной рендер сцены.
+        static void RenderScene(
+            const Scene &scene,
+            const EditorCamera &camera,
+            int selectedEntity);
 
-        static void RenderScenePicking(const Scene &scene, const EditorCamera &camera);
+        // Скрытый рендер для выбора объекта мышкой.
+        static void RenderScenePicking(
+            const Scene &scene,
+            const EditorCamera &camera);
 
     private:
         static unsigned int s_VertexArray;

@@ -6,47 +6,38 @@
 #include <GL/glew.h>
 
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
 
 namespace RockEngine
 {
-    // OpenGL ID объекта, который хранит настройки вершин:
-    // какие данные есть у вершины, где позиция, цвет и т.д.
+    // VAO хранит описание формата вершин:
+    // какие данные есть у вершины и как OpenGL должен их читать.
     unsigned int Renderer::s_VertexArray = 0;
 
-    // OpenGL ID буфера, где лежат сами вершины куба.
+    // VBO хранит сами вершины куба.
     unsigned int Renderer::s_VertexBuffer = 0;
 
-    // OpenGL ID скомпилированной shader program.
     // Shader program = vertex shader + fragment shader.
     unsigned int Renderer::s_ShaderProgram = 0;
 
     void Renderer::Init()
     {
-        // Depth Test нужен, чтобы ближние полигоны перекрывали дальние.
-        // Без этого грани куба могут рисоваться в неправильном порядке.
+        // Depth test нужен для 3D.
+        // Ближние пиксели будут перекрывать дальние.
         glEnable(GL_DEPTH_TEST);
 
-        // Back-face culling отключает отрисовку задних граней.
-        // Это ускоряет рендер и делает куб чище визуально.
+        // Отсекаем задние грани куба.
+        // Это ускоряет рендер и убирает лишнюю геометрию.
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
 
-        // Формат каждой вершины:
-        //
+        // Формат вершины:
         // x, y, z, r, g, b
         //
         // x y z — позиция вершины
         // r g b — цвет вершины
-        //
-        // Куб состоит из 6 граней.
-        // Каждая грань = 2 треугольника.
-        // Каждый треугольник = 3 вершины.
-        //
-        // 6 граней * 2 треугольника * 3 вершины = 36 вершин.
         float vertices[] =
             {
                 // Front face - red
@@ -284,10 +275,6 @@ namespace RockEngine
                 1.0f,
             };
 
-        // =========================
-        // SHADERS
-        // =========================
-
         const char *vertexSrc = R"(
 #version 330
 
@@ -328,13 +315,13 @@ void main()
 }
 )";
 
-        // Компилируем vertex shader.
+        int success;
+        char infoLog[512];
+
+        // Создаем и компилируем vertex shader.
         unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertexShader, 1, &vertexSrc, nullptr);
         glCompileShader(vertexShader);
-
-        int success;
-        char infoLog[512];
 
         glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
         if (!success)
@@ -344,7 +331,7 @@ void main()
                       << infoLog << std::endl;
         }
 
-        // Компилируем fragment shader.
+        // Создаем и компилируем fragment shader.
         unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragmentShader, 1, &fragmentSrc, nullptr);
         glCompileShader(fragmentShader);
@@ -357,14 +344,10 @@ void main()
                       << infoLog << std::endl;
         }
 
-        // Создаем shader program.
+        // Создаем shader program и линкуем оба шейдера.
         s_ShaderProgram = glCreateProgram();
-
-        // Прикрепляем оба шейдера к программе.
         glAttachShader(s_ShaderProgram, vertexShader);
         glAttachShader(s_ShaderProgram, fragmentShader);
-
-        // Линкуем программу.
         glLinkProgram(s_ShaderProgram);
 
         glGetProgramiv(s_ShaderProgram, GL_LINK_STATUS, &success);
@@ -379,13 +362,11 @@ void main()
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
 
-        // =========================
-        // VAO / VBO
-        // =========================
-
+        // Создаем VAO.
         glGenVertexArrays(1, &s_VertexArray);
         glBindVertexArray(s_VertexArray);
 
+        // Создаем VBO и загружаем вершины в видеопамять.
         glGenBuffers(1, &s_VertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, s_VertexBuffer);
 
@@ -395,12 +376,8 @@ void main()
             vertices,
             GL_STATIC_DRAW);
 
-        // Attribute 0: Position.
-        //
-        // Вершина имеет формат:
-        // x y z r g b
-        //
-        // Позиция начинается с 0-го float.
+        // Attribute 0: позиция.
+        // stride = 6 float, потому что вершина: x y z r g b.
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(
             0,
@@ -410,10 +387,8 @@ void main()
             6 * sizeof(float),
             nullptr);
 
-        // Attribute 1: Color.
-        //
-        // Цвет начинается после первых трех float:
-        // x y z | r g b
+        // Attribute 1: цвет.
+        // offset = 3 float, потому что цвет начинается после x y z.
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(
             1,
@@ -464,37 +439,15 @@ void main()
         {
             const auto &entity = scene.Entities[i];
 
-            if (entity.Type != EntityType::Mesh)
+            // ECS-lite логика:
+            // если у объекта нет MeshRenderer, Renderer его не рисует.
+            if (!entity.HasMeshRenderer || !entity.MeshRenderer.Enabled)
             {
                 continue;
             }
 
-            const auto &t = entity.TransformComponent;
-
-            glm::mat4 model = glm::mat4(1.0f);
-
-            model = glm::translate(
-                model,
-                glm::vec3(t.Position[0], t.Position[1], t.Position[2]));
-
-            model = glm::rotate(
-                model,
-                glm::radians(t.Rotation[0]),
-                glm::vec3(1.0f, 0.0f, 0.0f));
-
-            model = glm::rotate(
-                model,
-                glm::radians(t.Rotation[1]),
-                glm::vec3(0.0f, 1.0f, 0.0f));
-
-            model = glm::rotate(
-                model,
-                glm::radians(t.Rotation[2]),
-                glm::vec3(0.0f, 0.0f, 1.0f));
-
-            model = glm::scale(
-                model,
-                glm::vec3(t.Scale[0], t.Scale[1], t.Scale[2]));
+            // TransformComponent сам собирает model matrix.
+            glm::mat4 model = entity.Transform.GetTransform();
 
             glm::mat4 mvp = projection * view * model;
 
@@ -505,7 +458,7 @@ void main()
                 glm::value_ptr(mvp));
 
             // Если объект выбран — рисуем его оранжевым.
-            // Если не выбран — используем цвета вершин куба.
+            // Иначе используем цветные грани куба.
             if (i == selectedEntity)
             {
                 glUniform1i(useObjectColorLocation, 1);
@@ -513,7 +466,14 @@ void main()
             }
             else
             {
-                glUniform1i(useObjectColorLocation, 0);
+                // Обычный объект рисуем цветом из MeshRendererComponent.
+                glUniform1i(useObjectColorLocation, 1);
+
+                glUniform3f(
+                    colorLocation,
+                    entity.MeshRenderer.Color.x,
+                    entity.MeshRenderer.Color.y,
+                    entity.MeshRenderer.Color.z);
             }
 
             glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -545,38 +505,13 @@ void main()
         {
             const auto &entity = scene.Entities[i];
 
-            if (entity.Type != EntityType::Mesh)
+            // Picking нужен только для объектов, которые реально рисуются.
+            if (!entity.HasMeshRenderer || !entity.MeshRenderer.Enabled)
             {
                 continue;
             }
 
-            const auto &t = entity.TransformComponent;
-
-            glm::mat4 model = glm::mat4(1.0f);
-
-            model = glm::translate(
-                model,
-                glm::vec3(t.Position[0], t.Position[1], t.Position[2]));
-
-            model = glm::rotate(
-                model,
-                glm::radians(t.Rotation[0]),
-                glm::vec3(1.0f, 0.0f, 0.0f));
-
-            model = glm::rotate(
-                model,
-                glm::radians(t.Rotation[1]),
-                glm::vec3(0.0f, 1.0f, 0.0f));
-
-            model = glm::rotate(
-                model,
-                glm::radians(t.Rotation[2]),
-                glm::vec3(0.0f, 0.0f, 1.0f));
-
-            model = glm::scale(
-                model,
-                glm::vec3(t.Scale[0], t.Scale[1], t.Scale[2]));
-
+            glm::mat4 model = entity.Transform.GetTransform();
             glm::mat4 mvp = projection * view * model;
 
             glUniformMatrix4fv(
@@ -585,10 +520,9 @@ void main()
                 GL_FALSE,
                 glm::value_ptr(mvp));
 
-            // Кодируем индекс entity в красный канал.
-            // i + 1 нужно, потому что 0 означает "ничего не выбрано".
+            // Кодируем индекс Entity в красный канал.
+            // 0 означает "ничего", поэтому используем i + 1.
             float idColor = static_cast<float>(i + 1) / 255.0f;
-
             glUniform3f(colorLocation, idColor, 0.0f, 0.0f);
 
             glDrawArrays(GL_TRIANGLES, 0, 36);

@@ -1,17 +1,38 @@
 Entity "Camera"
-Type Camera
+HasMeshRenderer 0
+HasCamera 1
+HasLight 0
+MeshRendererEnabled 1
+MeshRendererColor 0.2 0.7 1
+CameraPrimary 1
+LightColor 1 1 1
+LightIntensity 1
 Position 0 0 5
 Rotation 0 0 0
 Scale 1 1 1
 EndEntity
 Entity "Cube"
-Type Mesh
+HasMeshRenderer 1
+HasCamera 0
+HasLight 0
+MeshRendererEnabled 1
+MeshRendererColor 0.840061 0.878749 0.901961
+CameraPrimary 0
+LightColor 1 1 1
+LightIntensity 1
 Position 0 0 0
 Rotation 20 30 0
 Scale 1 1 1
 EndEntity
 Entity "Light"
-Type Light
+HasMeshRenderer 0
+HasCamera 0
+HasLight 1
+MeshRendererEnabled 1
+MeshRendererColor 0.2 0.7 1
+CameraPrimary 0
+LightColor 1 1 1
+LightIntensity 1
 Position 2 2 0
 Rotation 0 0 0
 Scale 1 1 1

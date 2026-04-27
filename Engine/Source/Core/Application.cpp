@@ -9,10 +9,9 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-#include <cstring>
+#include <filesystem>
 #include <iostream>
 #include <string>
-#include <filesystem>
 
 namespace RockEngine
 {
@@ -21,21 +20,24 @@ namespace RockEngine
     {
         std::cout << "Application created: " << name << std::endl;
 
-        // Создаем окно приложения.
+        // Создаем окно редактора.
         m_Window = std::make_unique<EngineWindow>(name, 1280, 720);
 
-        // Инициализируем рендерер.
+        // Инициализируем OpenGL renderer.
         Renderer::Init();
 
-        // Создаем framebuffer для Viewport.
+        // Основной framebuffer для отображения сцены в Viewport.
         m_Framebuffer = std::make_unique<Framebuffer>(1280, 720);
 
-        // Framebuffer для выбора
+        // Скрытый framebuffer для выбора объектов мышкой.
         m_PickingFramebuffer = std::make_unique<Framebuffer>(1280, 720);
 
-        // Создаем стандартную сцену.
+        // Создаем стартовую сцену: Camera + Cube + Light.
         m_Scene.CreateDefaultScene();
-        m_CurrentAssetPath = std::filesystem::path(ROCKENGINE_PROJECT_DIR) / "Assets";
+
+        // Начальная папка Asset Browser.
+        m_CurrentAssetPath =
+            std::filesystem::path(ROCKENGINE_PROJECT_DIR) / "Assets";
 
         // Инициализация ImGui.
         IMGUI_CHECKVERSION();
@@ -57,20 +59,54 @@ namespace RockEngine
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
 
-        // Освобождаем ресурсы рендера.
+        // Освобождаем OpenGL ресурсы Renderer.
         Renderer::Shutdown();
 
         std::cout << "Application destroyed" << std::endl;
     }
 
-    void Application::CreateEntity(const std::string &name, EntityType type)
+    void Application::CreateEntity(const std::string &name)
     {
+        // Создает пустой Entity только с Transform.
         Entity entity;
-
         entity.Name = name;
-        entity.Type = type;
 
         m_Scene.Entities.push_back(entity);
+    }
+
+    void Application::CreateCube()
+    {
+        // MeshRenderer означает: этот Entity должен рисоваться Renderer-ом.
+        Entity cube;
+        cube.Name = "Cube";
+        cube.HasMeshRenderer = true;
+
+        m_Scene.Entities.push_back(cube);
+    }
+
+    void Application::CreateCamera()
+    {
+        // CameraComponent пока является маркером.
+        // Позже из него сделаем игровую камеру.
+        Entity camera;
+        camera.Name = "Camera";
+        camera.HasCamera = true;
+        camera.Camera.Primary = false;
+        camera.Transform.Position = {0.0f, 0.0f, 5.0f};
+
+        m_Scene.Entities.push_back(camera);
+    }
+
+    void Application::CreateLight()
+    {
+        // LightComponent пока не влияет на освещение,
+        // но уже хранится в Entity как отдельный компонент.
+        Entity light;
+        light.Name = "Light";
+        light.HasLight = true;
+        light.Transform.Position = {2.0f, 2.0f, 0.0f};
+
+        m_Scene.Entities.push_back(light);
     }
 
     void Application::Run()
@@ -79,7 +115,7 @@ namespace RockEngine
 
         while (m_Running)
         {
-            // Считаем deltaTime — время между кадрами.
+            // deltaTime нужен для стабильного движения камеры.
             float currentTime = static_cast<float>(glfwGetTime());
             float deltaTime = currentTime - lastTime;
             lastTime = currentTime;
@@ -94,12 +130,15 @@ namespace RockEngine
             glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT);
 
-            // Начинаем новый кадр ImGui.
+            // Начинаем кадр ImGui.
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            // Главное docking-окно.
+            // =========================
+            // DOCKSPACE
+            // =========================
+            // Большое невидимое окно, в котором живут все панели редактора.
             ImGuiWindowFlags windowFlags =
                 ImGuiWindowFlags_MenuBar |
                 ImGuiWindowFlags_NoDocking |
@@ -135,13 +174,8 @@ namespace RockEngine
                 {
                     if (ImGui::MenuItem("New Scene"))
                     {
-                        // Создаем новую сцену в памяти.
                         m_Scene.CreateDefaultScene();
-
-                        // Сбрасываем выбранный объект.
                         m_SelectedEntity = -1;
-
-                        // Сцена новая, значит она пока не привязана к файлу.
                         m_CurrentScenePath.clear();
                     }
 
@@ -149,16 +183,12 @@ namespace RockEngine
 
                     if (ImGui::MenuItem("Save Scene"))
                     {
-                        // Если текущая сцена уже связана с файлом,
-                        // сохраняем именно в этот файл.
                         if (!m_CurrentScenePath.empty())
                         {
                             m_Scene.SaveToFile(m_CurrentScenePath.string());
                         }
                         else
                         {
-                            // Если сцена новая и файла еще нет,
-                            // временно сохраняем как Main.rockscene.
                             m_CurrentScenePath =
                                 std::filesystem::path(ROCKENGINE_PROJECT_DIR) /
                                 "Assets" /
@@ -178,9 +208,6 @@ namespace RockEngine
                             "Main.rockscene";
 
                         m_Scene.LoadFromFile(m_CurrentScenePath.string());
-
-                        // После загрузки сбрасываем выбор,
-                        // потому что старый индекс может указывать на другой объект.
                         m_SelectedEntity = -1;
                     }
 
@@ -196,19 +223,24 @@ namespace RockEngine
 
                 if (ImGui::BeginMenu("Create"))
                 {
+                    if (ImGui::MenuItem("Empty Entity"))
+                    {
+                        CreateEntity("Empty Entity");
+                    }
+
                     if (ImGui::MenuItem("Cube"))
                     {
-                        CreateEntity("Cube", EntityType::Mesh);
+                        CreateCube();
                     }
 
                     if (ImGui::MenuItem("Camera"))
                     {
-                        CreateEntity("Camera", EntityType::Camera);
+                        CreateCamera();
                     }
 
                     if (ImGui::MenuItem("Light"))
                     {
-                        CreateEntity("Light", EntityType::Light);
+                        CreateLight();
                     }
 
                     ImGui::EndMenu();
@@ -224,19 +256,19 @@ namespace RockEngine
 
             if (ImGui::Button("Create Entity"))
             {
-                CreateEntity("New Entity", EntityType::Mesh);
+                CreateEntity("New Entity");
             }
 
             ImGui::Separator();
 
-            for (int i = 0; i < m_Scene.Entities.size(); i++)
+            for (int i = 0; i < static_cast<int>(m_Scene.Entities.size()); i++)
             {
                 auto &entity = m_Scene.Entities[i];
 
                 std::string displayName =
                     entity.Name.empty() ? "Unnamed Entity" : entity.Name;
 
-                // ##i — скрытый ID для ImGui.
+                // ##i — скрытый уникальный ID для ImGui.
                 displayName += "##" + std::to_string(i);
 
                 if (ImGui::Selectable(displayName.c_str(), m_SelectedEntity == i))
@@ -247,8 +279,8 @@ namespace RockEngine
 
             ImGui::End();
 
-            // Защита от неправильного индекса после удаления.
-            if (m_SelectedEntity >= m_Scene.Entities.size())
+            // Если объект удалили, индекс мог стать невалидным.
+            if (m_SelectedEntity >= static_cast<int>(m_Scene.Entities.size()))
             {
                 m_SelectedEntity = -1;
             }
@@ -262,6 +294,8 @@ namespace RockEngine
             {
                 auto &entity = m_Scene.Entities[m_SelectedEntity];
 
+                // Буфер нужен, потому что ImGui::InputText работает с char[],
+                // а имя Entity хранится как std::string.
                 static char nameBuffer[256] = "";
                 static int lastSelectedEntity = -1;
 
@@ -276,21 +310,56 @@ namespace RockEngine
                     entity.Name = nameBuffer;
                 }
 
-                const char *typeName = "Mesh";
+                ImGui::Separator();
 
-                if (entity.Type == EntityType::Camera)
-                    typeName = "Camera";
-                else if (entity.Type == EntityType::Light)
-                    typeName = "Light";
+                // =========================
+                // COMPONENTS
+                // =========================
+                ImGui::Text("Components");
 
-                ImGui::Text("Type: %s", typeName);
+                ImGui::Checkbox("Mesh Renderer", &entity.HasMeshRenderer);
+                ImGui::Checkbox("Camera", &entity.HasCamera);
+                ImGui::Checkbox("Light", &entity.HasLight);
+
+                if (entity.HasMeshRenderer)
+                {
+                    ImGui::Separator();
+                    ImGui::Text("Mesh Renderer Component");
+
+                    // Включает/выключает отрисовку объекта.
+                    ImGui::Checkbox("Enabled", &entity.MeshRenderer.Enabled);
+
+                    // Меняет цвет объекта.
+                    ImGui::ColorEdit3("Color", &entity.MeshRenderer.Color.x);
+                }
 
                 ImGui::Separator();
 
+                // =========================
+                // TRANSFORM COMPONENT
+                // =========================
                 ImGui::Text("Transform");
-                ImGui::InputFloat3("Position", entity.TransformComponent.Position);
-                ImGui::InputFloat3("Rotation", entity.TransformComponent.Rotation);
-                ImGui::InputFloat3("Scale", entity.TransformComponent.Scale);
+
+                // glm::vec3 хранит x/y/z подряд в памяти,
+                // поэтому можно передавать адрес x.
+                ImGui::DragFloat3("Position", &entity.Transform.Position.x, 0.1f);
+                ImGui::DragFloat3("Rotation", &entity.Transform.Rotation.x, 0.5f);
+                ImGui::DragFloat3("Scale", &entity.Transform.Scale.x, 0.1f);
+
+                if (entity.HasLight)
+                {
+                    ImGui::Separator();
+                    ImGui::Text("Light Component");
+                    ImGui::ColorEdit3("Color", &entity.Light.Color.x);
+                    ImGui::DragFloat("Intensity", &entity.Light.Intensity, 0.1f, 0.0f, 100.0f);
+                }
+
+                if (entity.HasCamera)
+                {
+                    ImGui::Separator();
+                    ImGui::Text("Camera Component");
+                    ImGui::Checkbox("Primary", &entity.Camera.Primary);
+                }
 
                 ImGui::Separator();
 
@@ -312,18 +381,8 @@ namespace RockEngine
             // =========================
             // ASSET BROWSER
             // =========================
-            // Это окно показывает содержимое папки Assets.
-            // Здесь мы можем:
-            // - смотреть папки и файлы
-            // - заходить в папки двойным кликом
-            // - возвращаться назад
-            // - выбирать ассеты
-            // - загружать .rockscene двойным кликом
-            // - перетаскивать файлы drag & drop
             ImGui::Begin("Assets");
 
-            // Показываем текущую сцену.
-            // Если путь пустой — сцена еще не сохранена как файл.
             if (!m_CurrentScenePath.empty())
             {
                 ImGui::Text(
@@ -335,114 +394,74 @@ namespace RockEngine
                 ImGui::Text("Current Scene: Untitled");
             }
 
-            // Показываем текущую открытую папку в Asset Browser.
             ImGui::Text(
                 "Path: %s",
                 m_CurrentAssetPath.string().c_str());
 
-            // Корневая папка Assets.
-            // Выше нее кнопка Back подниматься не должна.
             std::filesystem::path assetsRoot =
                 std::filesystem::path(ROCKENGINE_PROJECT_DIR) / "Assets";
 
-            // Если мы не в корне Assets — показываем кнопку Back.
             if (m_CurrentAssetPath != assetsRoot)
             {
                 if (ImGui::Button("<- Back"))
                 {
-                    // parent_path() возвращает папку выше.
                     m_CurrentAssetPath = m_CurrentAssetPath.parent_path();
-
-                    // Сбрасываем выбранный ассет, чтобы не показывать старый файл.
                     m_SelectedAssetPath.clear();
                 }
             }
 
             ImGui::Separator();
 
-            // Проверяем, существует ли текущая папка.
             if (std::filesystem::exists(m_CurrentAssetPath))
             {
-                // Проходим по всем файлам и папкам внутри текущей директории.
                 for (const auto &entry : std::filesystem::directory_iterator(m_CurrentAssetPath))
                 {
                     const std::filesystem::path path = entry.path();
-
-                    // Имя файла или папки без полного пути.
                     std::string filename = path.filename().string();
 
-                    // Очень важная строка.
-                    // PushID дает каждому элементу уникальный внутренний ID.
-                    // Даже если на экране два элемента имеют одинаковый текст,
-                    // ImGui не будет путать их между собой.
+                    // Уникальный ID, чтобы ImGui не путал элементы с одинаковым именем.
                     ImGui::PushID(path.string().c_str());
 
                     if (entry.is_directory())
                     {
-                        // Текст, который видит пользователь.
                         std::string label = "[Folder] " + filename;
 
-                        // Проверяем, выбрана ли эта папка в Asset Browser.
                         bool isFolderSelected = (m_SelectedAssetPath == path);
 
-                        // Selectable делает строку кликабельной.
                         if (ImGui::Selectable(label.c_str(), isFolderSelected))
                         {
-                            // Одинарный клик выбирает папку.
                             m_SelectedAssetPath = path;
                         }
 
-                        // Двойной клик по папке — заходим внутрь.
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
                         {
                             m_CurrentAssetPath = path;
-
-                            // После входа в папку сбрасываем выбранный ассет.
                             m_SelectedAssetPath.clear();
                         }
                     }
                     else
                     {
-                        // Текст, который видит пользователь.
                         std::string label = "[File] " + filename;
 
-                        // Проверяем, выбран ли этот файл.
                         bool isFileSelected = (m_SelectedAssetPath == path);
 
-                        // Одинарный клик выбирает файл.
                         if (ImGui::Selectable(label.c_str(), isFileSelected))
                         {
                             m_SelectedAssetPath = path;
                         }
 
-                        // =========================
-                        // DOUBLE CLICK LOAD
-                        // =========================
-                        // Если дважды кликнули по .rockscene — загружаем сцену.
                         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
                         {
                             if (path.extension() == ".rockscene")
                             {
-                                // Запоминаем текущую открытую сцену.
                                 m_CurrentScenePath = path;
-
-                                // Загружаем сцену из файла.
                                 m_Scene.LoadFromFile(m_CurrentScenePath.string());
-
-                                // Сбрасываем выбранный объект,
-                                // потому что после загрузки старый индекс может быть неверным.
                                 m_SelectedEntity = -1;
                             }
                         }
 
-                        // =========================
-                        // DRAG SOURCE
-                        // =========================
-                        // Если пользователь начал тащить файл мышкой —
-                        // создаем payload для drag & drop.
                         if (ImGui::BeginDragDropSource())
                         {
-                            // Передаем полный путь к файлу.
                             std::string fullPath = path.string();
 
                             ImGui::SetDragDropPayload(
@@ -450,15 +469,12 @@ namespace RockEngine
                                 fullPath.c_str(),
                                 fullPath.size() + 1);
 
-                            // Текст рядом с курсором во время перетаскивания.
                             ImGui::Text("%s", filename.c_str());
 
                             ImGui::EndDragDropSource();
                         }
                     }
 
-                    // Закрываем уникальный ID элемента.
-                    // PushID и PopID всегда должны идти парой.
                     ImGui::PopID();
                 }
             }
@@ -472,7 +488,6 @@ namespace RockEngine
             // =========================
             // ASSET INSPECTOR
             // =========================
-            // Это окно показывает информацию о выбранном ассете.
             ImGui::Begin("Asset Inspector");
 
             if (!m_SelectedAssetPath.empty())
@@ -527,16 +542,20 @@ namespace RockEngine
                     static_cast<uint32_t>(viewportSize.x),
                     static_cast<uint32_t>(viewportSize.y));
 
+                m_PickingFramebuffer->Resize(
+                    static_cast<uint32_t>(viewportSize.x),
+                    static_cast<uint32_t>(viewportSize.y));
+
+                // Обновляем editor camera только когда Viewport активен.
                 m_EditorCamera.SetViewportSize(viewportSize.x, viewportSize.y);
                 m_EditorCamera.OnUpdate(deltaTime);
 
-                // =========================
-                // 1. РЕНДЕР ОСНОВНОЙ СЦЕНЫ
-                // =========================
+                // Рендер обычной сцены.
                 m_Framebuffer->Bind();
 
                 glViewport(
-                    0, 0,
+                    0,
+                    0,
                     static_cast<int>(viewportSize.x),
                     static_cast<int>(viewportSize.y));
 
@@ -545,7 +564,7 @@ namespace RockEngine
 
                 m_Framebuffer->Unbind();
 
-                // Показываем сцену в ImGui
+                // Показываем результат framebuffer в ImGui.
                 ImGui::Image(
                     reinterpret_cast<void *>(
                         static_cast<intptr_t>(m_Framebuffer->GetColorAttachment())),
@@ -553,22 +572,30 @@ namespace RockEngine
                     ImVec2(0, 1),
                     ImVec2(1, 0));
 
-                // =========================
-                // VIEWPORT DROP TARGET
-                // =========================
-                // Viewport принимает файлы, которые мы перетаскиваем из Assets.
+                // Рендер скрытого picking buffer.
+                m_PickingFramebuffer->Bind();
+
+                glViewport(
+                    0,
+                    0,
+                    static_cast<int>(viewportSize.x),
+                    static_cast<int>(viewportSize.y));
+
+                Renderer::BeginFrame();
+                Renderer::RenderScenePicking(m_Scene, m_EditorCamera);
+
+                m_PickingFramebuffer->Unbind();
+
+                // Drag & Drop файлов в Viewport.
                 if (ImGui::BeginDragDropTarget())
                 {
-                    // Проверяем, пришел ли payload типа "ASSET_FILE".
                     if (const ImGuiPayload *payload = ImGui::AcceptDragDropPayload("ASSET_FILE"))
                     {
-                        // payload->Data содержит строку с путем к файлу.
-                        const char *droppedPath = static_cast<const char *>(payload->Data);
+                        const char *droppedPath =
+                            static_cast<const char *>(payload->Data);
 
                         std::filesystem::path assetPath = droppedPath;
 
-                        // Если в Viewport бросили .rockscene —
-                        // загружаем эту сцену.
                         if (assetPath.extension() == ".rockscene")
                         {
                             m_CurrentScenePath = assetPath;
@@ -580,24 +607,7 @@ namespace RockEngine
                     ImGui::EndDragDropTarget();
                 }
 
-                // =========================
-                // 2. РЕНДЕР PICKING (СКРЫТЫЙ)
-                // =========================
-                m_PickingFramebuffer->Bind();
-
-                glViewport(
-                    0, 0,
-                    static_cast<int>(viewportSize.x),
-                    static_cast<int>(viewportSize.y));
-
-                Renderer::BeginFrame();
-                Renderer::RenderScenePicking(m_Scene, m_EditorCamera);
-
-                m_PickingFramebuffer->Unbind();
-
-                // =========================
-                // 3. ЧТЕНИЕ КЛИКА МЫШИ
-                // =========================
+                // Mouse picking.
                 if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(0))
                 {
                     ImVec2 mousePos = ImGui::GetMousePos();
@@ -613,7 +623,8 @@ namespace RockEngine
                     glReadPixels(
                         x,
                         static_cast<int>(viewportSize.y) - y,
-                        1, 1,
+                        1,
+                        1,
                         GL_RGBA,
                         GL_UNSIGNED_BYTE,
                         pixel);
@@ -634,13 +645,13 @@ namespace RockEngine
             // Закрываем DockSpace Window.
             ImGui::End();
 
-            // Рисуем ImGui.
+            // Отрисовываем весь ImGui UI.
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             Renderer::EndFrame();
 
-            // Обновляем окно: события + swap buffers.
+            // Обновляем окно: input events + swap buffers.
             m_Window->OnUpdate();
         }
     }
